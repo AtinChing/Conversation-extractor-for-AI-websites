@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Conversation Extractor</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="panel">
+      <header class="header">
+        <div class="brand-mark" aria-hidden="true"></div>
+        <div class="brand-copy">
+          <h1>Conversation Extractor</h1>
+          <p>Export chats · Claudify ChatGPT</p>
+        </div>
+      </header>
+
+      <section class="card" aria-labelledby="theme-label">
+        <div class="row">
+          <div class="label-stack">
+            <label id="theme-label" for="claudeThemeToggle">Apply Claude Theme to ChatGPT</label>
+            <span class="hint">Warm linen surfaces, serif responses, sand user bubbles</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="claudeThemeToggle" />
+            <span class="slider" aria-hidden="true"></span>
+          </label>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="format-label">
+        <div class="label-stack full">
+          <label id="format-label" for="exportFormat">Export Format</label>
+          <span class="hint">Used by the on-page Download Transcript button</span>
+        </div>
+        <select id="exportFormat" class="select">
+          <option value="markdown">Markdown</option>
+          <option value="json">JSON</option>
+        </select>
+      </section>
+
+      <footer class="footer">
+        <p id="statusText">Open ChatGPT or Claude, then click Download Transcript.</p>
+      </footer>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

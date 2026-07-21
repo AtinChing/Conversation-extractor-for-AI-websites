@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "Conversation Extractor for AI Websites",
+  "description": "Export ChatGPT and Claude conversations to Markdown or JSON, and optionally apply Claude's warm aesthetic to ChatGPT.",
+  "version": "1.0.0",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "Conversation Extractor",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "https://claude.ai/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://chatgpt.com/*"],
+      "js": ["content.js"],
+      "css": ["button.css", "theme.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://claude.ai/*"],
+      "js": ["content.js"],
+      "css": ["button.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["theme.css", "icons/*"],
+      "matches": ["https://chatgpt.com/*", "https://claude.ai/*"]
+    }
+  ]
+}

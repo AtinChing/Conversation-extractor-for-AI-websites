@@ -1,0 +1,77 @@
+#ce-download-transcript {
+  position: fixed;
+  top: 72px;
+  right: 20px;
+  z-index: 2147483646;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid rgba(31, 30, 28, 0.12);
+  border-radius: 999px;
+  background: #fbfaf7;
+  color: #1f1e1c;
+  font: 600 13px/1.2 "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif;
+  letter-spacing: -0.01em;
+  box-shadow: 0 10px 28px rgba(40, 30, 20, 0.16);
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    background 140ms ease;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#ce-download-transcript:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 32px rgba(40, 30, 20, 0.2);
+  background: #fffdf8;
+}
+
+#ce-download-transcript:active {
+  transform: translateY(0);
+}
+
+#ce-download-transcript:focus-visible {
+  outline: 2px solid #c67a4a;
+  outline-offset: 3px;
+}
+
+#ce-download-transcript[data-busy="true"] {
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+#ce-download-transcript .ce-icon {
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+#ce-download-transcript .ce-label {
+  white-space: nowrap;
+}
+
+@media (prefers-color-scheme: dark) {
+  #ce-download-transcript {
+    background: #2a2927;
+    color: #f8f8f6;
+    border-color: rgba(248, 248, 246, 0.14);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  }
+
+  #ce-download-transcript:hover {
+    background: #33312e;
+  }
+}
+
+html.dark #ce-download-transcript,
+html[data-theme="dark"] #ce-download-transcript,
+body.dark #ce-download-transcript {
+  background: #2a2927;
+  color: #f8f8f6;
+  border-color: rgba(248, 248, 246, 0.14);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+}

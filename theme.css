@@ -1,0 +1,143 @@
+html[data-claudifier="on"] {
+  --ce-linen: #fbfaf7;
+  --ce-linen-deep: #f3efe6;
+  --ce-sand: #ebe4d6;
+  --ce-sand-strong: #e2d7c4;
+  --ce-ink: #1f1e1c;
+  --ce-ink-soft: #3f3a33;
+  --ce-muted: #6b655c;
+  --ce-clay: #c67a4a;
+  --ce-serif: "Anthropic Serif", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+  --ce-sans: "Anthropic Sans", "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif;
+  --ce-mono: "Anthropic Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+  --bg-primary: var(--ce-linen) !important;
+  --bg-secondary: var(--ce-linen-deep) !important;
+  --bg-tertiary: var(--ce-sand) !important;
+  --bg-elevated-primary: #fffdf9 !important;
+  --bg-elevated-secondary: var(--ce-linen) !important;
+  --bg-secondary-surface: var(--ce-linen) !important;
+  --component-sidebar-bg: #f5f1e8 !important;
+  --text-primary: var(--ce-ink) !important;
+  --text-secondary: var(--ce-ink-soft) !important;
+  --text-tertiary: var(--ce-muted) !important;
+  --text-inverted: var(--ce-linen) !important;
+  --main-surface-background: var(--ce-linen) !important;
+  --main-surface-primary: var(--ce-linen) !important;
+  --main-surface-secondary: var(--ce-linen-deep) !important;
+  --sidebar-surface-primary: #f5f1e8 !important;
+  --sidebar-surface-secondary: #efe8db !important;
+  --composer-surface: #fffdf9 !important;
+  --border-light: rgba(31, 30, 28, 0.1) !important;
+  --border-medium: rgba(31, 30, 28, 0.16) !important;
+  --border-heavy: rgba(31, 30, 28, 0.22) !important;
+  color-scheme: light !important;
+}
+
+html[data-claudifier="on"],
+html[data-claudifier="on"] body {
+  background: var(--ce-linen) !important;
+  color: var(--ce-ink) !important;
+  font-family: var(--ce-sans) !important;
+}
+
+html[data-claudifier="on"] main,
+html[data-claudifier="on"] [class*="composer"],
+html[data-claudifier="on"] [data-testid="conversation-turn-list"],
+html[data-claudifier="on"] #thread,
+html[data-claudifier="on"] .flex.h-full.flex-col {
+  background: transparent !important;
+}
+
+html[data-claudifier="on"] nav,
+html[data-claudifier="on"] aside,
+html[data-claudifier="on"] [data-testid="sidebar"],
+html[data-claudifier="on"] [class*="sidebar"] {
+  background: #f5f1e8 !important;
+  border-color: rgba(31, 30, 28, 0.08) !important;
+  color: var(--ce-ink) !important;
+}
+
+html[data-claudifier="on"] [data-message-author-role="assistant"],
+html[data-claudifier="on"] [data-message-author-role="assistant"] .markdown,
+html[data-claudifier="on"] [data-message-author-role="assistant"] .prose,
+html[data-claudifier="on"] [data-message-author-role="assistant"] [class*="markdown"],
+html[data-claudifier="on"] article[data-testid^="conversation-turn-"] [data-message-author-role="assistant"] {
+  font-family: var(--ce-serif) !important;
+  color: var(--ce-ink) !important;
+  font-size: 1.05rem !important;
+  line-height: 1.7 !important;
+  letter-spacing: -0.01em !important;
+}
+
+html[data-claudifier="on"] [data-message-author-role="assistant"] p,
+html[data-claudifier="on"] [data-message-author-role="assistant"] li,
+html[data-claudifier="on"] [data-message-author-role="assistant"] blockquote {
+  font-family: var(--ce-serif) !important;
+  line-height: 1.75 !important;
+}
+
+html[data-claudifier="on"] [data-message-author-role="assistant"] h1,
+html[data-claudifier="on"] [data-message-author-role="assistant"] h2,
+html[data-claudifier="on"] [data-message-author-role="assistant"] h3,
+html[data-claudifier="on"] [data-message-author-role="assistant"] h4 {
+  font-family: var(--ce-serif) !important;
+  font-weight: 650 !important;
+  letter-spacing: -0.02em !important;
+  color: var(--ce-ink) !important;
+}
+
+html[data-claudifier="on"] [data-message-author-role="user"] {
+  font-family: var(--ce-sans) !important;
+}
+
+html[data-claudifier="on"] [data-message-author-role="user"] .whitespace-pre-wrap,
+html[data-claudifier="on"] [data-message-author-role="user"] [class*="user-message"],
+html[data-claudifier="on"] [data-message-author-role="user"] > div > div,
+html[data-claudifier="on"] [data-testid="user-message"] {
+  background: var(--ce-sand) !important;
+  color: var(--ce-ink) !important;
+  border-radius: 22px !important;
+  padding: 12px 16px !important;
+  border: 1px solid rgba(31, 30, 28, 0.06) !important;
+  box-shadow: none !important;
+}
+
+html[data-claudifier="on"] [data-message-author-role="assistant"] pre,
+html[data-claudifier="on"] [data-message-author-role="assistant"] code {
+  font-family: var(--ce-mono) !important;
+}
+
+html[data-claudifier="on"] [data-message-author-role="assistant"] pre {
+  background: #f3efe6 !important;
+  border: 1px solid rgba(31, 30, 28, 0.08) !important;
+  border-radius: 14px !important;
+  color: var(--ce-ink) !important;
+}
+
+html[data-claudifier="on"] [data-message-author-role="assistant"] :not(pre) > code {
+  background: rgba(198, 122, 74, 0.12) !important;
+  color: #8a4d28 !important;
+  border-radius: 6px !important;
+  padding: 0.1em 0.35em !important;
+}
+
+html[data-claudifier="on"] textarea,
+html[data-claudifier="on"] [contenteditable="true"],
+html[data-claudifier="on"] #prompt-textarea,
+html[data-claudifier="on"] [data-testid="composer"] {
+  background: #fffdf9 !important;
+  color: var(--ce-ink) !important;
+  border-color: rgba(31, 30, 28, 0.12) !important;
+  font-family: var(--ce-sans) !important;
+}
+
+html[data-claudifier="on"] button,
+html[data-claudifier="on"] a {
+  font-family: var(--ce-sans) !important;
+}
+
+html[data-claudifier="on"] ::selection {
+  background: rgba(198, 122, 74, 0.28);
+  color: var(--ce-ink);
+}
