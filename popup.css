@@ -92,13 +92,6 @@ body {
   backdrop-filter: blur(8px);
 }
 
-.row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-}
-
 .label-stack {
   display: grid;
   gap: 4px;
@@ -119,54 +112,6 @@ label {
   font-size: 11px;
   color: var(--muted);
   line-height: 1.35;
-}
-
-.switch {
-  position: relative;
-  width: 46px;
-  height: 28px;
-  flex: 0 0 auto;
-}
-
-.switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.slider {
-  position: absolute;
-  inset: 0;
-  cursor: pointer;
-  background: color-mix(in srgb, var(--muted) 28%, transparent);
-  border-radius: 999px;
-  transition: background 160ms ease;
-}
-
-.slider::before {
-  content: "";
-  position: absolute;
-  width: 22px;
-  height: 22px;
-  left: 3px;
-  top: 3px;
-  background: #fff;
-  border-radius: 50%;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-  transition: transform 160ms ease;
-}
-
-.switch input:checked + .slider {
-  background: var(--accent);
-}
-
-.switch input:checked + .slider::before {
-  transform: translateX(18px);
-}
-
-.switch input:focus-visible + .slider {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 
 .select {

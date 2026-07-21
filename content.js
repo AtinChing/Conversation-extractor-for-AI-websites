@@ -1,17 +1,21 @@
 (() => {
   "use strict";
 
-  const BUTTON_ID = "ce-download-transcript";
-  const STORAGE_DEFAULTS = {
-    claudeThemeEnabled: false,
-    exportFormat: "markdown"
-  };
+  const CE = globalThis.CE;
+  if (!CE) {
+    console.error("[Conversation Extractor] CE namespace missing — check manifest script order");
+    return;
+  }
 
+  const BUTTON_ID = "ce-download-transcript";
   const PLATFORM = detectPlatform();
   if (!PLATFORM) return;
 
-  let exportFormat = STORAGE_DEFAULTS.exportFormat;
+  let exportFormat = CE.DEFAULT_FORMAT_ID;
   let injectScheduled = false;
+
+  // Shared with Claude scraper module
+  CE.serializeRichContent = serializeRichContent;
 
   init();
 
@@ -23,29 +27,21 @@
   }
 
   async function init() {
-    const settings = await chrome.storage.local.get(STORAGE_DEFAULTS);
-    exportFormat = settings.exportFormat === "json" ? "json" : "markdown";
-
-    if (PLATFORM === "chatgpt") {
-      applyClaudeTheme(Boolean(settings.claudeThemeEnabled));
-    }
+    const settings = await chrome.storage.local.get(CE.STORAGE_DEFAULTS);
+    exportFormat = CE.isFormatId(settings.exportFormat)
+      ? settings.exportFormat
+      : CE.DEFAULT_FORMAT_ID;
 
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "local") return;
       if (changes.exportFormat) {
-        exportFormat = changes.exportFormat.newValue === "json" ? "json" : "markdown";
-      }
-      if (PLATFORM === "chatgpt" && changes.claudeThemeEnabled) {
-        applyClaudeTheme(Boolean(changes.claudeThemeEnabled.newValue));
+        const next = changes.exportFormat.newValue;
+        exportFormat = CE.isFormatId(next) ? next : CE.DEFAULT_FORMAT_ID;
       }
     });
 
     ensureButton();
     observeDom();
-  }
-
-  function applyClaudeTheme(enabled) {
-    document.documentElement.setAttribute("data-claudifier", enabled ? "on" : "off");
   }
 
   function observeDom() {
@@ -116,21 +112,28 @@
     if (label) label.textContent = "Exporting…";
 
     try {
-      const conversation = scrapeConversation();
+      if (label) label.textContent = PLATFORM === "claude" ? "Scanning…" : "Exporting…";
+      const conversation = await scrapeConversation();
       if (!conversation.messages.length) {
         flashLabel(label, "No messages found", previous);
         return;
       }
 
-      const format = exportFormat === "json" ? "json" : "markdown";
-      const payload =
-        format === "json"
-          ? JSON.stringify(buildJson(conversation), null, 2)
-          : buildMarkdown(conversation);
-      const extension = format === "json" ? "json" : "md";
-      const mime = format === "json" ? "application/json" : "text/markdown";
-      downloadFile(slugify(conversation.title) + "." + extension, payload, mime);
-      flashLabel(label, "Downloaded", previous);
+      const format =
+        CE.getFormat(exportFormat) || CE.getFormat(CE.DEFAULT_FORMAT_ID);
+      if (!format) {
+        flashLabel(label, "No format registered", previous);
+        return;
+      }
+
+      if (label) label.textContent = "Exporting…";
+      const payload = format.serialize(conversation);
+      CE.downloadFile(
+        `${CE.slugify(conversation.title)}.${format.extension}`,
+        payload,
+        format.mime
+      );
+      flashLabel(label, `Saved ${conversation.messages.length}`, previous);
     } catch (error) {
       console.error("[Conversation Extractor] Export failed", error);
       flashLabel(label, "Export failed", previous);
@@ -147,10 +150,12 @@
     }, 1600);
   }
 
-  function scrapeConversation() {
+  async function scrapeConversation() {
     const title = getConversationTitle();
     const messages =
-      PLATFORM === "chatgpt" ? scrapeChatGPT() : scrapeClaude();
+      PLATFORM === "chatgpt"
+        ? scrapeChatGPT()
+        : await CE.scrapeClaudeFull();
 
     return {
       platform: PLATFORM,
@@ -278,123 +283,6 @@
       if (node && node.textContent && node.textContent.trim()) return node;
     }
     return roleNode;
-  }
-
-  function scrapeClaude() {
-    const nodes = collectClaudeMessages();
-    const messages = [];
-
-    for (const node of nodes) {
-      const role = resolveClaudeRole(node);
-      if (!role) continue;
-
-      const clone = node.cloneNode(true);
-      stripClaudeArtifacts(clone);
-      const contentRoot = findClaudeContentRoot(clone) || clone;
-      const content = serializeRichContent(contentRoot);
-      if (!content.trim()) continue;
-      messages.push({ role, content: content.trim() });
-    }
-
-    return dedupeAdjacent(messages);
-  }
-
-  function collectClaudeMessages() {
-    const selector = [
-      '[data-testid="user-message"]',
-      '[data-testid="human-message"]',
-      '[data-testid="message-human"]',
-      ".font-user-message",
-      ".\\!font-user-message",
-      '[class*="font-user-message"]',
-      ".font-claude-response",
-      '[data-testid="ai-message"]',
-      '[data-testid="message-assistant"]',
-      ".font-claude-message",
-      ".assistant-message"
-    ].join(", ");
-
-    const nodes = dedupeElements([...document.querySelectorAll(selector)]).filter(
-      (el) => isReadableCandidate(el) && !isNoiseNode(el)
-    );
-
-    const outermost = nodes.filter(
-      (el) => !nodes.some((other) => other !== el && other.contains(el))
-    );
-
-    if (outermost.length) return outermost.sort(byDocumentOrder);
-
-    const groups = [...document.querySelectorAll("[data-test-render-count]")];
-    return groups.filter((el) => isReadableCandidate(el)).sort(byDocumentOrder);
-  }
-
-  function resolveClaudeRole(node) {
-    const userSelector = [
-      '[data-testid="user-message"]',
-      '[data-testid="human-message"]',
-      '[data-testid="message-human"]',
-      ".font-user-message",
-      ".\\!font-user-message",
-      '[class*="font-user-message"]'
-    ].join(", ");
-
-    const assistantSelector = [
-      ".font-claude-response",
-      '[data-testid="ai-message"]',
-      '[data-testid="message-assistant"]',
-      ".font-claude-message",
-      ".assistant-message"
-    ].join(", ");
-
-    if (node.matches(userSelector)) return "user";
-    if (node.matches(assistantSelector)) return "assistant";
-    if (node.querySelector(userSelector)) return "user";
-    if (node.querySelector(assistantSelector)) return "assistant";
-    return null;
-  }
-
-  function findClaudeContentRoot(node) {
-    const selectors = [
-      ".standard-markdown",
-      ".progressive-markdown",
-      ".font-claude-response-body",
-      ".markdown",
-      ".prose",
-      '[class*="markdown"]'
-    ];
-    for (const selector of selectors) {
-      const found = node.querySelector(selector);
-      if (found && found.textContent && found.textContent.trim()) return found;
-    }
-    return node;
-  }
-
-  function stripClaudeArtifacts(root) {
-    const junkSelectors = [
-      "button",
-      '[data-testid="action-bar-copy"]',
-      '[data-testid*="feedback"]',
-      '[aria-label*="Copy"]',
-      '[aria-label*="Good response"]',
-      '[aria-label*="Bad response"]',
-      '[aria-label*="Retry"]',
-      '[aria-label*="Edit"]',
-      '[class*="CopyButton"]',
-      '[class*="feedback"]',
-      "svg",
-      "style",
-      "script",
-      "noscript"
-    ];
-    for (const selector of junkSelectors) {
-      root.querySelectorAll(selector).forEach((el) => el.remove());
-    }
-  }
-
-  function isNoiseNode(el) {
-    if (el.closest("#" + BUTTON_ID)) return true;
-    if (el.getAttribute("aria-hidden") === "true") return true;
-    return false;
   }
 
   function isReadableCandidate(el) {
@@ -580,68 +468,5 @@
     return 0;
   }
 
-  function buildMarkdown(conversation) {
-    const lines = [
-      `# ${conversation.title}`,
-      "",
-      `- Platform: ${conversation.platform === "chatgpt" ? "ChatGPT" : "Claude"}`,
-      `- URL: ${conversation.url}`,
-      `- Exported: ${conversation.exportedAt}`,
-      "",
-      "---",
-      ""
-    ];
-
-    conversation.messages.forEach((message, index) => {
-      const heading = message.role === "user" ? "User" : "Assistant";
-      lines.push(`## ${heading}`);
-      lines.push("");
-      lines.push(message.content);
-      if (index < conversation.messages.length - 1) {
-        lines.push("");
-        lines.push("---");
-        lines.push("");
-      }
-    });
-
-    return lines.join("\n").trim() + "\n";
-  }
-
-  function buildJson(conversation) {
-    return {
-      title: conversation.title,
-      platform: conversation.platform,
-      url: conversation.url,
-      exportedAt: conversation.exportedAt,
-      messageCount: conversation.messages.length,
-      messages: conversation.messages.map((message, index) => ({
-        index: index + 1,
-        role: message.role,
-        content: message.content
-      }))
-    };
-  }
-
-  function downloadFile(filename, content, mime) {
-    const blob = new Blob([content], { type: `${mime};charset=utf-8` });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = filename;
-    anchor.style.display = "none";
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1500);
-  }
-
-  function slugify(value) {
-    const base = String(value || "conversation")
-      .toLowerCase()
-      .replace(/['"]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 80);
-    return base || "conversation";
-  }
 })();
+

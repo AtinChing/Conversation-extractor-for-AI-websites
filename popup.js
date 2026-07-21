@@ -1,43 +1,47 @@
-const DEFAULTS = {
-  claudeThemeEnabled: false,
-  exportFormat: "markdown"
-};
+(() => {
+  "use strict";
 
-const themeToggle = document.getElementById("claudeThemeToggle");
-const formatSelect = document.getElementById("exportFormat");
-const statusText = document.getElementById("statusText");
+  const CE = globalThis.CE;
+  if (!CE) {
+    console.error("[Conversation Extractor] CE namespace missing");
+    return;
+  }
 
-function setStatus(message) {
-  statusText.textContent = message;
-}
+  const formatSelect = document.getElementById("exportFormat");
+  const statusText = document.getElementById("statusText");
 
-async function loadSettings() {
-  const stored = await chrome.storage.local.get(DEFAULTS);
-  themeToggle.checked = Boolean(stored.claudeThemeEnabled);
-  formatSelect.value = stored.exportFormat === "json" ? "json" : "markdown";
-}
+  function setStatus(message) {
+    statusText.textContent = message;
+  }
 
-async function saveSettings(partial) {
-  await chrome.storage.local.set(partial);
-}
+  async function loadSettings() {
+    // Drop legacy Claudifier key if present from older builds.
+    await chrome.storage.local.remove("claudeThemeEnabled");
 
-themeToggle.addEventListener("change", async () => {
-  const claudeThemeEnabled = themeToggle.checked;
-  await saveSettings({ claudeThemeEnabled });
-  setStatus(
-    claudeThemeEnabled
-      ? "Claude theme enabled for ChatGPT tabs."
-      : "Claude theme disabled."
-  );
-});
+    const stored = await chrome.storage.local.get(CE.STORAGE_DEFAULTS);
+    const selected = CE.isFormatId(stored.exportFormat)
+      ? stored.exportFormat
+      : CE.DEFAULT_FORMAT_ID;
+    CE.populateFormatSelect(formatSelect, selected);
 
-formatSelect.addEventListener("change", async () => {
-  const exportFormat = formatSelect.value === "json" ? "json" : "markdown";
-  await saveSettings({ exportFormat });
-  setStatus(`Export format set to ${exportFormat === "json" ? "JSON" : "Markdown"}.`);
-});
+    if (stored.exportFormat !== selected) {
+      await chrome.storage.local.set({ exportFormat: selected });
+    }
+  }
 
-loadSettings().catch((error) => {
-  console.error("[Conversation Extractor] Failed to load settings", error);
-  setStatus("Could not load settings.");
-});
+  formatSelect.addEventListener("change", async () => {
+    const exportFormat = formatSelect.value;
+    if (!CE.isFormatId(exportFormat)) {
+      setStatus("Unknown export format.");
+      return;
+    }
+    await chrome.storage.local.set({ exportFormat });
+    const format = CE.getFormat(exportFormat);
+    setStatus(`Export format set to ${format.label}.`);
+  });
+
+  loadSettings().catch((error) => {
+    console.error("[Conversation Extractor] Failed to load settings", error);
+    setStatus("Could not load settings.");
+  });
+})();
