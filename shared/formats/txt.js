@@ -9,6 +9,7 @@
   function platformLabel(platform) {
     if (platform === "chatgpt") return "ChatGPT";
     if (platform === "claude") return "Claude";
+    if (platform === "gemini") return "Gemini";
     return String(platform || "Unknown");
   }
 

@@ -15,8 +15,16 @@
  *   4. shared/formats/markdown.js
  *   5. shared/formats/json.js
  *   6. shared/formats/txt.js
- *   7. shared/scrape-claude.js  (content scripts only; skip in popup.html)
- *   8. content.js  (or popup.js)
+ *   7. shared/scroll-harvest.js     (content scripts only)
+ *   8. shared/scrape-claude.js      (content scripts only)
+ *   9. shared/scrape-chatgpt.js     (content scripts only)
+ *  10. shared/scrape-gemini.js      (content scripts only)
+ *  11. content.js  (or popup.js — popup skips scrapers / scroll-harvest)
+ *
+ * PLATFORMS
+ *   chatgpt → CE.scrapeChatGPTFull()
+ *   claude  → CE.scrapeClaudeFull()
+ *   gemini  → CE.scrapeGeminiFull()
  *
  * STORAGE KEYS (chrome.storage.local)
  *   exportFormat: string  — MUST be a registered format id

@@ -23,6 +23,9 @@
     const host = location.hostname;
     if (host === "chatgpt.com" || host.endsWith(".chatgpt.com")) return "chatgpt";
     if (host === "claude.ai" || host.endsWith(".claude.ai")) return "claude";
+    if (host === "gemini.google.com" || host.endsWith(".gemini.google.com")) {
+      return "gemini";
+    }
     return null;
   }
 
@@ -112,7 +115,7 @@
     if (label) label.textContent = "Exporting…";
 
     try {
-      if (label) label.textContent = PLATFORM === "claude" ? "Scanning…" : "Exporting…";
+      if (label) label.textContent = "Scanning…";
       const conversation = await scrapeConversation();
       if (!conversation.messages.length) {
         flashLabel(label, "No messages found", previous);
@@ -152,10 +155,15 @@
 
   async function scrapeConversation() {
     const title = getConversationTitle();
-    const messages =
-      PLATFORM === "chatgpt"
-        ? scrapeChatGPT()
-        : await CE.scrapeClaudeFull();
+    let messages = [];
+
+    if (PLATFORM === "chatgpt" && typeof CE.scrapeChatGPTFull === "function") {
+      messages = await CE.scrapeChatGPTFull();
+    } else if (PLATFORM === "claude" && typeof CE.scrapeClaudeFull === "function") {
+      messages = await CE.scrapeClaudeFull();
+    } else if (PLATFORM === "gemini" && typeof CE.scrapeGeminiFull === "function") {
+      messages = await CE.scrapeGeminiFull();
+    }
 
     return {
       platform: PLATFORM,
@@ -171,14 +179,18 @@
       document.querySelector("title")?.textContent,
       document.querySelector("h1")?.textContent,
       document.querySelector('[data-testid="conversation-title"]')?.textContent,
-      document.querySelector('[data-testid="chat-title"]')?.textContent
+      document.querySelector('[data-testid="chat-title"]')?.textContent,
+      document.querySelector("[data-test-id='conversation-title']")?.textContent
     ];
 
     for (const raw of candidates) {
       const cleaned = cleanTitle(raw);
       if (cleaned) return cleaned;
     }
-    return PLATFORM === "chatgpt" ? "ChatGPT Conversation" : "Claude Conversation";
+
+    if (PLATFORM === "chatgpt") return "ChatGPT Conversation";
+    if (PLATFORM === "gemini") return "Gemini Conversation";
+    return "Claude Conversation";
   }
 
   function cleanTitle(raw) {
@@ -188,108 +200,10 @@
       .replace(/\s*[|–—-]\s*ChatGPT\s*$/i, "")
       .replace(/\s*[|–—-]\s*Claude\s*$/i, "")
       .replace(/\s*-\s*Claude\s*$/i, "")
+      .replace(/\s*[|–—-]\s*Gemini.*$/i, "")
+      .replace(/\s*-\s*Gemini.*$/i, "")
       .trim();
     return title;
-  }
-
-  function scrapeChatGPT() {
-    const turns = collectChatGPTTurns();
-    const messages = [];
-
-    for (const turn of turns) {
-      const role = resolveChatGPTRole(turn);
-      if (!role) continue;
-
-      const contentRoot = findChatGPTContentRoot(turn, role);
-      const content = serializeRichContent(contentRoot || turn);
-      if (!content.trim()) continue;
-
-      messages.push({ role, content: content.trim() });
-    }
-
-    return dedupeAdjacent(messages);
-  }
-
-  function collectChatGPTTurns() {
-    const selectorSets = [
-      'article[data-testid^="conversation-turn-"]',
-      '[data-testid="conversation-turn"]',
-      "[data-message-author-role]",
-      "main article"
-    ];
-
-    for (const selector of selectorSets) {
-      const nodes = dedupeElements([...document.querySelectorAll(selector)]).filter(
-        (el) => isReadableCandidate(el)
-      );
-      if (!nodes.length) continue;
-
-      const outermost = nodes.filter(
-        (el) => !nodes.some((other) => other !== el && other.contains(el))
-      );
-      if (outermost.length) {
-        return outermost.sort(byDocumentOrder);
-      }
-    }
-    return [];
-  }
-
-  function resolveChatGPTRole(turn) {
-    const attr =
-      turn.getAttribute("data-message-author-role") ||
-      turn.getAttribute("data-turn") ||
-      turn.getAttribute("data-role") ||
-      turn.getAttribute("data-message-author") ||
-      "";
-
-    if (/^user$/i.test(attr)) return "user";
-    if (/^(assistant|ai|system)$/i.test(attr)) return "assistant";
-
-    const nested = turn.querySelector(
-      "[data-message-author-role], [data-turn], [data-role], [data-message-author]"
-    );
-    if (nested) {
-      const nestedAttr =
-        nested.getAttribute("data-message-author-role") ||
-        nested.getAttribute("data-turn") ||
-        nested.getAttribute("data-role") ||
-        nested.getAttribute("data-message-author") ||
-        "";
-      if (/^user$/i.test(nestedAttr)) return "user";
-      if (/^(assistant|ai|system)$/i.test(nestedAttr)) return "assistant";
-    }
-
-    if (turn.querySelector(".agent-turn")) return "assistant";
-    if (turn.querySelector(".user-turn")) return "user";
-    return null;
-  }
-
-  function findChatGPTContentRoot(turn, role) {
-    const roleNode =
-      turn.matches("[data-message-author-role]")
-        ? turn
-        : turn.querySelector(`[data-message-author-role="${role}"]`) || turn;
-
-    const contentSelectors = [
-      ".markdown",
-      ".prose",
-      '[class*="markdown"]',
-      ".whitespace-pre-wrap",
-      "[data-message-id]"
-    ];
-
-    for (const selector of contentSelectors) {
-      const node = roleNode.querySelector(selector);
-      if (node && node.textContent && node.textContent.trim()) return node;
-    }
-    return roleNode;
-  }
-
-  function isReadableCandidate(el) {
-    if (!(el instanceof HTMLElement)) return false;
-    if (el.closest("#" + BUTTON_ID)) return false;
-    const text = (el.innerText || el.textContent || "").replace(/\s+/g, " ").trim();
-    return text.length >= 1;
   }
 
   function serializeRichContent(root) {
@@ -442,30 +356,6 @@
       ...body.map((row) => `| ${row.join(" | ")} |`)
     ];
     return lines.join("\n");
-  }
-
-  function dedupeAdjacent(messages) {
-    const result = [];
-    for (const message of messages) {
-      const prev = result[result.length - 1];
-      if (prev && prev.role === message.role && prev.content === message.content) {
-        continue;
-      }
-      result.push(message);
-    }
-    return result;
-  }
-
-  function dedupeElements(elements) {
-    return [...new Set(elements)];
-  }
-
-  function byDocumentOrder(a, b) {
-    if (a === b) return 0;
-    const position = a.compareDocumentPosition(b);
-    if (position & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
-    if (position & Node.DOCUMENT_POSITION_PRECEDING) return 1;
-    return 0;
   }
 
 })();

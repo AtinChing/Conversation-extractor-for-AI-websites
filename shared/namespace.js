@@ -18,7 +18,7 @@
 
   /**
    * @typedef {Object} CEConversation
-   * @property {"chatgpt"|"claude"} platform
+   * @property {"chatgpt"|"claude"|"gemini"} platform
    * @property {string} title
    * @property {string} url
    * @property {string} exportedAt

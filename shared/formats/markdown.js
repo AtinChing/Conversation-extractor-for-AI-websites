@@ -8,7 +8,8 @@
 
   const PLATFORM_LABELS = {
     chatgpt: "ChatGPT",
-    claude: "Claude"
+    claude: "Claude",
+    gemini: "Gemini"
   };
 
   const ROLE_HEADINGS = {

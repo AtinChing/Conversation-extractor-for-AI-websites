@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Conversation Extractor for AI Websites",
-  "description": "Export ChatGPT and Claude conversations to Markdown, JSON, or plain text.",
-  "version": "1.1.0",
+  "description": "Export ChatGPT, Claude, and Gemini conversations to Markdown, JSON, or plain text.",
+  "version": "1.2.0",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
@@ -20,11 +20,16 @@
   "permissions": ["storage"],
   "host_permissions": [
     "https://chatgpt.com/*",
-    "https://claude.ai/*"
+    "https://claude.ai/*",
+    "https://gemini.google.com/*"
   ],
   "content_scripts": [
     {
-      "matches": ["https://chatgpt.com/*", "https://claude.ai/*"],
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*"
+      ],
       "js": [
         "shared/namespace.js",
         "shared/download.js",
@@ -32,7 +37,10 @@
         "shared/formats/markdown.js",
         "shared/formats/json.js",
         "shared/formats/txt.js",
+        "shared/scroll-harvest.js",
         "shared/scrape-claude.js",
+        "shared/scrape-chatgpt.js",
+        "shared/scrape-gemini.js",
         "content.js"
       ],
       "css": ["button.css"],
@@ -47,7 +55,11 @@
         "shared/formats/*",
         "shared/sleep-worker.js"
       ],
-      "matches": ["https://chatgpt.com/*", "https://claude.ai/*"]
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*"
+      ]
     }
   ]
 }
