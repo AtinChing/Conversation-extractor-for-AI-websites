@@ -8,7 +8,9 @@
 
   CE.STORAGE_DEFAULTS = Object.freeze({
     exportFormat: CE.DEFAULT_FORMAT_ID,
-    fastModeEnabled: true
+    fastModeEnabled: true,
+    floatingButtonVisible: true,
+    floatingButtonPosition: null
   });
 
   /**

@@ -23,8 +23,22 @@
  * STORAGE KEYS (chrome.storage.local)
  *   exportFormat: "markdown" | "json" | "txt"
  *   fastModeEnabled: boolean
- *     When true, content.js tries CE.scrapeFast(platform) first.
- *     On any throw / empty result → falls back to slow DOM scroll scrapers.
+ *     true  → Fast Mode (API) with automatic Slow Mode fallback
+ *     false → force Slow Mode only
+ *   floatingButtonVisible: boolean
+ *     true  → show compact on-page Download blob
+ *     false → hide on-page button (restore via popup)
+ *
+ * POPUP ACTIONS
+ *   - Choose export format
+ *   - Toggle Fast Mode (fallback) vs Slow Mode only
+ *   - Toggle / restore on-page floating button
+ *   - "Download Transcript" triggers export on the active ChatGPT/Claude/Gemini tab
+ *     via chrome.tabs.sendMessage → content.js handler "ce-export"
+ *
+ * ON-PAGE BUTTON
+ *   Compact icon blob with dismiss (X). Dismiss sets floatingButtonVisible=false.
+ *   content.js must respect storage and not re-inject while hidden.
  *
  * PLATFORMS
  *   chatgpt → fast: page handler "chatgpt.fetchConversation"
