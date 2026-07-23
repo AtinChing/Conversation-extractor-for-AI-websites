@@ -8,12 +8,18 @@
   }
 
   const BUTTON_ID = "ce-download-transcript";
+  const ROOT_ID = "ce-float-root";
   const PLATFORM = detectPlatform();
   if (!PLATFORM) return;
 
   let exportFormat = CE.DEFAULT_FORMAT_ID;
   let fastModeEnabled = true;
+  let floatingButtonVisible = true;
+  /** @type {{ left: number, top: number } | null} */
+  let floatingButtonPosition = null;
+  let exportBusy = false;
   let injectScheduled = false;
+  let dragMoved = false;
 
   // Shared with Claude scraper module
   CE.serializeRichContent = serializeRichContent;
@@ -36,6 +42,8 @@
       ? settings.exportFormat
       : CE.DEFAULT_FORMAT_ID;
     fastModeEnabled = settings.fastModeEnabled !== false;
+    floatingButtonVisible = settings.floatingButtonVisible !== false;
+    floatingButtonPosition = normalizePosition(settings.floatingButtonPosition);
 
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "local") return;
@@ -46,6 +54,55 @@
       if (changes.fastModeEnabled) {
         fastModeEnabled = changes.fastModeEnabled.newValue !== false;
       }
+      if (changes.floatingButtonVisible) {
+        floatingButtonVisible = changes.floatingButtonVisible.newValue !== false;
+        if (floatingButtonVisible) {
+          ensureButton();
+        } else {
+          hideButton();
+        }
+      }
+      if (changes.floatingButtonPosition) {
+        floatingButtonPosition = normalizePosition(
+          changes.floatingButtonPosition.newValue
+        );
+        applyButtonPosition(document.getElementById(ROOT_ID));
+      }
+    });
+
+    chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+      if (message?.type !== "ce-export") return;
+
+      if (exportBusy) {
+        sendResponse({ ok: false, error: "Export already in progress" });
+        return;
+      }
+
+      exportBusy = true;
+      const button = document.getElementById(BUTTON_ID);
+
+      runExport((status) => {
+        if (button) setButtonStatus(button, status);
+      })
+        .then((result) => {
+          sendResponse({
+            ok: true,
+            messageCount: result.messageCount,
+            exportMode: result.exportMode
+          });
+        })
+        .catch((error) => {
+          sendResponse({
+            ok: false,
+            error: error?.message || String(error)
+          });
+        })
+        .finally(() => {
+          exportBusy = false;
+          if (button) clearButtonStatus(button);
+        });
+
+      return true;
     });
 
     ensureButton();
@@ -85,86 +142,271 @@
     });
   }
 
+  function hideButton() {
+    document.getElementById(ROOT_ID)?.remove();
+  }
+
   function ensureButton() {
+    if (!floatingButtonVisible) {
+      hideButton();
+      return;
+    }
+
+    let root = document.getElementById(ROOT_ID);
     let button = document.getElementById(BUTTON_ID);
+
+    if (!root) {
+      root = document.createElement("div");
+      root.id = ROOT_ID;
+      root.className = "ce-float-root";
+    }
+
     if (!button) {
       button = document.createElement("button");
       button.id = BUTTON_ID;
       button.type = "button";
       button.setAttribute("aria-label", "Download Transcript");
+      button.title = "Drag to move · Click to download";
       button.innerHTML = `
         <svg class="ce-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
           <path fill="currentColor" d="M8 1.5a.75.75 0 0 1 .75.75v6.19l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 0 1 1.06-1.06l2.22 2.22V2.25A.75.75 0 0 1 8 1.5Zm-4.75 10a.75.75 0 0 0 0 1.5h9.5a.75.75 0 0 0 0-1.5h-9.5Z"/>
         </svg>
-        <span class="ce-label">Download Transcript</span>
+        <span class="ce-status" aria-live="polite"></span>
       `;
       button.addEventListener("click", onDownloadClick);
-      document.documentElement.appendChild(button);
+      root.appendChild(button);
+
+      const dismiss = document.createElement("button");
+      dismiss.type = "button";
+      dismiss.className = "ce-dismiss";
+      dismiss.setAttribute("aria-label", "Hide download button");
+      dismiss.innerHTML = `
+        <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+          <path fill="currentColor" d="M2.22 2.22a.75.75 0 0 1 1.06 0L6 4.94l2.72-2.72a.75.75 0 1 1 1.06 1.06L7.06 6l2.72 2.72a.75.75 0 0 1-1.06 1.06L6 7.06l-2.72 2.72a.75.75 0 0 1-1.06-1.06L4.94 6 2.22 3.28a.75.75 0 0 1 0-1.06Z"/>
+        </svg>
+      `;
+      dismiss.addEventListener("click", onDismissClick);
+      root.appendChild(dismiss);
+    } else if (!root.contains(button)) {
+      root.appendChild(button);
+      if (!root.querySelector(".ce-dismiss")) {
+        const dismiss = document.createElement("button");
+        dismiss.type = "button";
+        dismiss.className = "ce-dismiss";
+        dismiss.setAttribute("aria-label", "Hide download button");
+        dismiss.innerHTML = `
+          <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+            <path fill="currentColor" d="M2.22 2.22a.75.75 0 0 1 1.06 0L6 4.94l2.72-2.72a.75.75 0 1 1 1.06 1.06L7.06 6l2.72 2.72a.75.75 0 0 1-1.06 1.06L6 7.06l-2.72 2.72a.75.75 0 0 1-1.06-1.06L4.94 6 2.22 3.28a.75.75 0 0 1 0-1.06Z"/>
+          </svg>
+        `;
+        dismiss.addEventListener("click", onDismissClick);
+        root.appendChild(dismiss);
+      }
     }
 
-    if (!document.body.contains(button) && document.body) {
-      document.body.appendChild(button);
+    if (button && button.dataset.ceDragBound !== "1") {
+      button.title = "Drag to move · Click to download";
+      button.addEventListener("pointerdown", onDragPointerDown);
+      button.dataset.ceDragBound = "1";
     }
+
+    applyButtonPosition(root);
+
+    if (!document.body.contains(root) && document.body) {
+      document.body.appendChild(root);
+    }
+  }
+
+  function normalizePosition(value) {
+    if (!value || typeof value !== "object") return null;
+    const left = Number(value.left);
+    const top = Number(value.top);
+    if (!Number.isFinite(left) || !Number.isFinite(top)) return null;
+    return { left, top };
+  }
+
+  function applyButtonPosition(root) {
+    if (!root) return;
+    if (floatingButtonPosition) {
+      const clamped = clampPosition(
+        floatingButtonPosition.left,
+        floatingButtonPosition.top,
+        root
+      );
+      root.style.left = `${clamped.left}px`;
+      root.style.top = `${clamped.top}px`;
+      root.style.right = "auto";
+      root.dataset.dragged = "true";
+    } else {
+      root.style.left = "";
+      root.style.top = "";
+      root.style.right = "";
+      delete root.dataset.dragged;
+    }
+  }
+
+  function clampPosition(left, top, root) {
+    const width = root?.offsetWidth || 44;
+    const height = root?.offsetHeight || 44;
+    const maxLeft = Math.max(8, window.innerWidth - width - 8);
+    const maxTop = Math.max(8, window.innerHeight - height - 8);
+    return {
+      left: Math.min(Math.max(8, left), maxLeft),
+      top: Math.min(Math.max(8, top), maxTop)
+    };
+  }
+
+  function onDragPointerDown(event) {
+    if (event.button !== 0) return;
+    if (event.target?.closest?.(".ce-dismiss")) return;
+
+    const root = document.getElementById(ROOT_ID);
+    const button = document.getElementById(BUTTON_ID);
+    if (!root || !button || exportBusy) return;
+
+    const rect = root.getBoundingClientRect();
+    const offsetX = event.clientX - rect.left;
+    const offsetY = event.clientY - rect.top;
+    dragMoved = false;
+
+    root.dataset.dragging = "true";
+    button.setPointerCapture?.(event.pointerId);
+
+    const onMove = (moveEvent) => {
+      const next = clampPosition(
+        moveEvent.clientX - offsetX,
+        moveEvent.clientY - offsetY,
+        root
+      );
+      if (
+        Math.abs(next.left - rect.left) > 3 ||
+        Math.abs(next.top - rect.top) > 3
+      ) {
+        dragMoved = true;
+      }
+      root.style.left = `${next.left}px`;
+      root.style.top = `${next.top}px`;
+      root.style.right = "auto";
+      root.dataset.dragged = "true";
+      floatingButtonPosition = next;
+    };
+
+    const onUp = async (upEvent) => {
+      button.releasePointerCapture?.(upEvent.pointerId);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      delete root.dataset.dragging;
+
+      if (!dragMoved || !floatingButtonPosition) return;
+
+      try {
+        await chrome.storage.local.set({
+          floatingButtonPosition: { ...floatingButtonPosition }
+        });
+      } catch (error) {
+        console.error("[Conversation Extractor] Failed to persist button position", error);
+      }
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+  }
+
+  async function onDismissClick(event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    floatingButtonVisible = false;
+    hideButton();
+
+    try {
+      await chrome.storage.local.set({ floatingButtonVisible: false });
+    } catch (error) {
+      console.error("[Conversation Extractor] Failed to persist dismiss", error);
+    }
+  }
+
+  function setButtonStatus(button, text) {
+    const status = button.querySelector(".ce-status");
+    if (status) status.textContent = text;
+    button.dataset.showStatus = "true";
+    if (text) button.setAttribute("aria-label", text);
+  }
+
+  function clearButtonStatus(button) {
+    const status = button.querySelector(".ce-status");
+    if (status) status.textContent = "";
+    delete button.dataset.showStatus;
+    delete button.dataset.busy;
+    button.setAttribute("aria-label", "Download Transcript");
+  }
+
+  function flashButtonStatus(button, message) {
+    setButtonStatus(button, message);
+    window.setTimeout(() => {
+      clearButtonStatus(button);
+    }, 1600);
   }
 
   async function onDownloadClick(event) {
     event.preventDefault();
     event.stopPropagation();
 
-    const button = document.getElementById(BUTTON_ID);
-    if (!button || button.dataset.busy === "true") return;
+    // Ignore click that ends a drag.
+    if (dragMoved) {
+      dragMoved = false;
+      return;
+    }
 
+    const button = document.getElementById(BUTTON_ID);
+    if (!button || exportBusy) return;
+
+    exportBusy = true;
     button.dataset.busy = "true";
-    const label = button.querySelector(".ce-label");
-    const previous = label ? label.textContent : "Download Transcript";
-    if (label) label.textContent = "Exporting…";
 
     try {
-      if (label) {
-        label.textContent = fastModeEnabled ? "Fast export…" : "Scanning…";
-      }
-      const conversation = await scrapeConversation((status) => {
-        if (label) label.textContent = status;
+      const result = await runExport((status) => {
+        setButtonStatus(button, status);
       });
-      if (!conversation.messages.length) {
-        flashLabel(label, "No messages found", previous);
-        return;
-      }
-
-      const format =
-        CE.getFormat(exportFormat) || CE.getFormat(CE.DEFAULT_FORMAT_ID);
-      if (!format) {
-        flashLabel(label, "No format registered", previous);
-        return;
-      }
-
-      if (label) label.textContent = "Exporting…";
-      const payload = format.serialize(conversation);
-      CE.downloadFile(
-        `${CE.slugify(conversation.title)}.${format.extension}`,
-        payload,
-        format.mime
-      );
-      const modeTag = conversation.exportMode === "fast" ? "fast" : "slow";
-      flashLabel(
-        label,
-        `Saved ${conversation.messages.length} (${modeTag})`,
-        previous
-      );
+      const modeTag = result.exportMode === "fast" ? "fast" : "slow";
+      flashButtonStatus(button, `Saved ${result.messageCount} (${modeTag})`);
     } catch (error) {
       console.error("[Conversation Extractor] Export failed", error);
-      flashLabel(label, "Export failed", previous);
+      flashButtonStatus(button, error?.message || "Export failed");
     } finally {
-      button.dataset.busy = "false";
+      exportBusy = false;
+      delete button.dataset.busy;
     }
   }
 
-  function flashLabel(label, message, restore) {
-    if (!label) return;
-    label.textContent = message;
-    window.setTimeout(() => {
-      label.textContent = restore || "Download Transcript";
-    }, 1600);
+  async function runExport(onStatus) {
+    onStatus?.(fastModeEnabled ? "Fast export…" : "Scanning…");
+    const conversation = await scrapeConversation(onStatus);
+
+    if (!conversation.messages.length) {
+      throw new Error("No messages found");
+    }
+
+    const format =
+      CE.getFormat(exportFormat) || CE.getFormat(CE.DEFAULT_FORMAT_ID);
+    if (!format) {
+      throw new Error("No format registered");
+    }
+
+    onStatus?.("Exporting…");
+    const payload = format.serialize(conversation);
+    CE.downloadFile(
+      `${CE.slugify(conversation.title)}.${format.extension}`,
+      payload,
+      format.mime
+    );
+
+    return {
+      messageCount: conversation.messages.length,
+      exportMode: conversation.exportMode
+    };
   }
 
   async function scrapeConversation(onStatus) {
@@ -404,4 +646,3 @@
   }
 
 })();
-
