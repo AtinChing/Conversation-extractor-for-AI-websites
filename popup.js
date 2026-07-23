@@ -8,6 +8,7 @@
   }
 
   const formatSelect = document.getElementById("exportFormat");
+  const fastModeCheckbox = document.getElementById("fastModeEnabled");
   const statusText = document.getElementById("statusText");
 
   function setStatus(message) {
@@ -27,7 +28,19 @@
     if (stored.exportFormat !== selected) {
       await chrome.storage.local.set({ exportFormat: selected });
     }
+
+    fastModeCheckbox.checked = stored.fastModeEnabled !== false;
   }
+
+  fastModeCheckbox.addEventListener("change", async () => {
+    const fastModeEnabled = fastModeCheckbox.checked;
+    await chrome.storage.local.set({ fastModeEnabled });
+    setStatus(
+      fastModeEnabled
+        ? "Fast Mode on — uses site APIs, falls back to Slow Mode if needed."
+        : "Slow Mode on — DOM scroll scrape only."
+    );
+  });
 
   formatSelect.addEventListener("change", async () => {
     const exportFormat = formatSelect.value;

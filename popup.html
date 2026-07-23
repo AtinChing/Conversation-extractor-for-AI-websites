@@ -24,6 +24,22 @@
         <select id="exportFormat" class="select"></select>
       </section>
 
+      <section class="card" aria-labelledby="fast-mode-label">
+        <div class="setting-row">
+          <div class="label-stack">
+            <label id="fast-mode-label" for="fastModeEnabled">Fast Mode</label>
+            <span class="hint"
+              >Uses each site’s internal APIs for instant export. If Fast Mode fails, falls back to Slow
+              Mode automatically.</span
+            >
+          </div>
+          <label class="switch" aria-label="Toggle Fast Mode">
+            <input type="checkbox" id="fastModeEnabled" />
+            <span class="switch-track" aria-hidden="true"></span>
+          </label>
+        </div>
+      </section>
+
       <footer class="footer">
         <p id="statusText">Open ChatGPT, Claude, or Gemini, then click Download Transcript.</p>
       </footer>
