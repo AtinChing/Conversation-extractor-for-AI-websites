@@ -7,7 +7,8 @@
   CE.DEFAULT_FORMAT_ID = "markdown";
 
   CE.STORAGE_DEFAULTS = Object.freeze({
-    exportFormat: CE.DEFAULT_FORMAT_ID
+    exportFormat: CE.DEFAULT_FORMAT_ID,
+    fastModeEnabled: true
   });
 
   /**

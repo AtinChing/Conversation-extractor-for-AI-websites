@@ -3,90 +3,61 @@
  * Conversation Extractor — Shared Contracts (read before editing)
  * ============================================================================
  *
- * WHY THIS EXISTS
- * Parallel agents implement formats / scrapers independently. Everything routes
- * through globalThis.CE so popup UI, content scripts, and format modules never
- * invent competing APIs or duplicate serializers inside content.js.
- *
- * LOAD ORDER (manifest + popup.html must match)
+ * LOAD ORDER — isolated world (manifest content_scripts, default world)
  *   1. shared/namespace.js
  *   2. shared/download.js
  *   3. shared/format-registry.js
- *   4. shared/formats/markdown.js
- *   5. shared/formats/json.js
- *   6. shared/formats/txt.js
- *   7. shared/scroll-harvest.js     (content scripts only)
- *   8. shared/scrape-claude.js      (content scripts only)
- *   9. shared/scrape-chatgpt.js     (content scripts only)
- *  10. shared/scrape-gemini.js      (content scripts only)
- *  11. content.js  (or popup.js — popup skips scrapers / scroll-harvest)
+ *   4. shared/formats/markdown.js | json.js | txt.js
+ *   5. shared/scroll-harvest.js
+ *   6. shared/scrape-claude.js | scrape-chatgpt.js | scrape-gemini.js   (SLOW)
+ *   7. shared/scrape-fast.js                                           (FAST orchestrator)
+ *   8. content.js
  *
- * PLATFORMS
- *   chatgpt → CE.scrapeChatGPTFull()
- *   claude  → CE.scrapeClaudeFull()
- *   gemini  → CE.scrapeGeminiFull()
+ * LOAD ORDER — MAIN world (manifest content_scripts world: "MAIN")
+ *   1. shared/page-bridge.js
+ *   2. shared/main/chatgpt-fast.js
+ *   3. shared/main/claude-fast.js
+ *   4. shared/main/gemini-fast.js
+ *   (popup.html does NOT load MAIN / scrape scripts)
  *
  * STORAGE KEYS (chrome.storage.local)
- *   exportFormat: string  — MUST be a registered format id
- *                           ("markdown" | "json" | "txt")
+ *   exportFormat: "markdown" | "json" | "txt"
+ *   fastModeEnabled: boolean
+ *     When true, content.js tries CE.scrapeFast(platform) first.
+ *     On any throw / empty result → falls back to slow DOM scroll scrapers.
  *
- * CONVERSATION SHAPE (scrapers → formatters)
- *   {
- *     platform: "chatgpt" | "claude",
- *     title: string,
- *     url: string,
- *     exportedAt: ISO-8601 string,
- *     messages: Array<{ role: "user" | "assistant", content: string }>
- *   }
- *   `content` is plain text with Markdown-ish structure already normalized by
- *   the scraper (headings, lists, fenced code). Formatters must not re-scrape DOM.
+ * PLATFORMS
+ *   chatgpt → fast: page handler "chatgpt.fetchConversation"
+ *             slow: CE.scrapeChatGPTFull()
+ *   claude  → fast: page handler "claude.fetchConversation"
+ *             slow: CE.scrapeClaudeFull()
+ *   gemini  → fast: page handler "gemini.fetchConversation"
+ *             slow: CE.scrapeGeminiFull()
  *
- * FORMAT MODULE CONTRACT
- *   Each file under shared/formats/ MUST call exactly once:
+ * FAST MODE PAGE BRIDGE
+ *   MAIN world exposes window.__CE_PAGE__:
+ *     register(actionName, async (payload) => result)
+ *   Isolated world calls:
+ *     const result = await CE.pageRequest(actionName, payload)
+ *   Result MUST be:
+ *     { title?: string, messages: Array<{ role: "user"|"assistant", content: string }> }
+ *   On failure the MAIN handler should throw (bridge turns it into a rejected promise).
  *
- *     CE.registerFormat({
- *       id: "markdown",          // stable storage / <option value>
- *       label: "Markdown",       // popup select label
- *       extension: "md",         // download filename suffix (no dot)
- *       mime: "text/markdown",   // Blob type
- *       serialize(conversation)  // returns string file body
- *     });
+ * FAST SCRAPER OWNERSHIP (one file each — do not edit siblings)
+ *   Agent chatgpt-fast : shared/main/chatgpt-fast.js only
+ *   Agent claude-fast  : shared/main/claude-fast.js only
+ *   Agent gemini-fast  : shared/main/gemini-fast.js only
+ *   Agent popup-ui     : popup.html, popup.js, popup.css only (Fast Mode toggle + warning)
+ *   Agent unify        : content.js / scrape-fast.js / manifest glue only if needed
  *
- *   Rules:
- *   - Do NOT touch popup.html option lists (registry fills them).
- *   - Do NOT edit other format files.
- *   - Do NOT put scraper logic in format files.
- *   - serialize() must be pure: conversation in → string out.
+ * Each MAIN fast file MUST:
+ *   1. Wait for window.__CE_PAGE__
+ *   2. Call __CE_PAGE__.register("<platform>.fetchConversation", handler)
+ *   3. Use the page's authenticated session (cookies / tokens already on page)
+ *   4. Return the FULL conversation (not only visible DOM)
+ *   5. Never call DOM scroll harvest (that is slow mode)
  *
- * POPUP REACHABILITY
- *   popup.js calls:
- *     CE.populateFormatSelect(selectEl, selectedId)
- *     CE.isFormatId(id)
- *   On change → chrome.storage.local.set({ exportFormat: id })
- *
- * CONTENT SCRIPT REACHABILITY
- *   content.js calls:
- *     const fmt = CE.getFormat(exportFormatId) || CE.getFormat("markdown")
- *     const body = fmt.serialize(conversation)
- *     CE.downloadFile(`${CE.slugify(title)}.${fmt.extension}`, body, fmt.mime)
- *
- * CLAUDE SCRAPER CONTRACT (content.js / optional shared/scrape-claude.js)
- *   Must return the FULL conversation, not only currently mounted virtual rows.
- *   Preferred strategy: locate scroll root → scroll top→bottom (or bottom→top
- *   then top→bottom) → accumulate messages keyed by stable id/fingerprint →
- *   restore scroll position → return ordered messages[].
- *   Expose as: CE.scrapeClaudeFull?.() or keep scrapeClaude() inside content.js
- *   but route scrapeConversation() through it.
- *
- * OWNERSHIP / CONFLICT AVOIDANCE
- *   Agent Claude-full-capture : content.js Claude scrape path only (+ helpers)
- *   Agent format-markdown     : shared/formats/markdown.js only
- *   Agent format-json         : shared/formats/json.js only
- *   Agent format-txt          : shared/formats/txt.js only
- *   Agent unify               : wiring (manifest, popup.js, content.js glue),
- *                               remove dead inline serializers, smoke-check
- *
- * Do not rename CE.registerFormat / CE.getFormat / CE.listFormats without
+ * Do not rename CE.pageRequest / CE.scrapeFast / __CE_PAGE__.register without
  * updating every consumer in the same change.
  */
 void 0;
