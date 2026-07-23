@@ -19,7 +19,7 @@
       <section class="card" aria-labelledby="format-label">
         <div class="label-stack full">
           <label id="format-label" for="exportFormat">Export Format</label>
-          <span class="hint">Used by the on-page Download Transcript button</span>
+          <span class="hint">Used when downloading from the popup or on-page button</span>
         </div>
         <select id="exportFormat" class="select"></select>
       </section>
@@ -27,10 +27,10 @@
       <section class="card" aria-labelledby="fast-mode-label">
         <div class="setting-row">
           <div class="label-stack">
-            <label id="fast-mode-label" for="fastModeEnabled">Fast Mode</label>
-            <span class="hint"
-              >Uses each site’s internal APIs for instant export. If Fast Mode fails, falls back to Slow
-              Mode automatically.</span
+            <label id="fast-mode-label" for="fastModeEnabled">Fast Mode (API)</label>
+            <span class="hint" id="fastModeHint"
+              ><strong>ON:</strong> Fast Mode (API) with automatic Slow Mode fallback.
+              <strong>OFF:</strong> Slow Mode only — force DOM scroll scrape.</span
             >
           </div>
           <label class="switch" aria-label="Toggle Fast Mode">
@@ -38,6 +38,36 @@
             <span class="switch-track" aria-hidden="true"></span>
           </label>
         </div>
+      </section>
+
+      <section class="card" aria-labelledby="floating-button-label">
+        <div class="setting-row">
+          <div class="label-stack">
+            <label id="floating-button-label" for="floatingButtonVisible">Show on-page button</label>
+            <span class="hint"
+              >Shows the floating Download blob on supported sites. Turn this on to restore it after
+              dismissing it on the page.</span
+            >
+          </div>
+          <div class="setting-controls">
+            <button
+              type="button"
+              id="resetBlobPosition"
+              class="btn-secondary-sm"
+              title="Move the blob back to its default top-right position"
+            >
+              Reset
+            </button>
+            <label class="switch" aria-label="Toggle on-page download button">
+              <input type="checkbox" id="floatingButtonVisible" />
+              <span class="switch-track" aria-hidden="true"></span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="actions">
+        <button type="button" id="downloadTranscript" class="btn-primary">Download Transcript</button>
       </section>
 
       <footer class="footer">
