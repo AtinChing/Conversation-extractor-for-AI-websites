@@ -12,6 +12,7 @@
   if (!PLATFORM) return;
 
   let exportFormat = CE.DEFAULT_FORMAT_ID;
+  let fastModeEnabled = true;
   let injectScheduled = false;
 
   // Shared with Claude scraper module
@@ -34,12 +35,16 @@
     exportFormat = CE.isFormatId(settings.exportFormat)
       ? settings.exportFormat
       : CE.DEFAULT_FORMAT_ID;
+    fastModeEnabled = settings.fastModeEnabled !== false;
 
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "local") return;
       if (changes.exportFormat) {
         const next = changes.exportFormat.newValue;
         exportFormat = CE.isFormatId(next) ? next : CE.DEFAULT_FORMAT_ID;
+      }
+      if (changes.fastModeEnabled) {
+        fastModeEnabled = changes.fastModeEnabled.newValue !== false;
       }
     });
 
@@ -115,8 +120,12 @@
     if (label) label.textContent = "Exporting…";
 
     try {
-      if (label) label.textContent = "Scanning…";
-      const conversation = await scrapeConversation();
+      if (label) {
+        label.textContent = fastModeEnabled ? "Fast export…" : "Scanning…";
+      }
+      const conversation = await scrapeConversation((status) => {
+        if (label) label.textContent = status;
+      });
       if (!conversation.messages.length) {
         flashLabel(label, "No messages found", previous);
         return;
@@ -136,7 +145,12 @@
         payload,
         format.mime
       );
-      flashLabel(label, `Saved ${conversation.messages.length}`, previous);
+      const modeTag = conversation.exportMode === "fast" ? "fast" : "slow";
+      flashLabel(
+        label,
+        `Saved ${conversation.messages.length} (${modeTag})`,
+        previous
+      );
     } catch (error) {
       console.error("[Conversation Extractor] Export failed", error);
       flashLabel(label, "Export failed", previous);
@@ -153,16 +167,33 @@
     }, 1600);
   }
 
-  async function scrapeConversation() {
-    const title = getConversationTitle();
+  async function scrapeConversation(onStatus) {
+    const titleHint = getConversationTitle();
     let messages = [];
+    let exportMode = "slow";
+    let title = titleHint;
 
-    if (PLATFORM === "chatgpt" && typeof CE.scrapeChatGPTFull === "function") {
-      messages = await CE.scrapeChatGPTFull();
-    } else if (PLATFORM === "claude" && typeof CE.scrapeClaudeFull === "function") {
-      messages = await CE.scrapeClaudeFull();
-    } else if (PLATFORM === "gemini" && typeof CE.scrapeGeminiFull === "function") {
-      messages = await CE.scrapeGeminiFull();
+    if (fastModeEnabled && typeof CE.scrapeFast === "function") {
+      try {
+        onStatus?.("Fast export…");
+        messages = await CE.scrapeFast(PLATFORM);
+        exportMode = "fast";
+        if (CE._fastTitleHint) {
+          title = CE._fastTitleHint;
+          CE._fastTitleHint = "";
+        }
+      } catch (error) {
+        console.warn(
+          "[Conversation Extractor] Fast mode failed; falling back to slow scrape",
+          error
+        );
+        onStatus?.("Fast failed → slow…");
+        messages = await scrapeSlow();
+        exportMode = "slow";
+      }
+    } else {
+      onStatus?.("Scanning…");
+      messages = await scrapeSlow();
     }
 
     return {
@@ -170,8 +201,22 @@
       title,
       url: location.href,
       exportedAt: new Date().toISOString(),
+      exportMode,
       messages
     };
+  }
+
+  async function scrapeSlow() {
+    if (PLATFORM === "chatgpt" && typeof CE.scrapeChatGPTFull === "function") {
+      return CE.scrapeChatGPTFull();
+    }
+    if (PLATFORM === "claude" && typeof CE.scrapeClaudeFull === "function") {
+      return CE.scrapeClaudeFull();
+    }
+    if (PLATFORM === "gemini" && typeof CE.scrapeGeminiFull === "function") {
+      return CE.scrapeGeminiFull();
+    }
+    return [];
   }
 
   function getConversationTitle() {
